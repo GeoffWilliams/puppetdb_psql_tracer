@@ -141,10 +141,12 @@ def run_test(test_cmd, test_name, test_value)
 
         # use tail + shell instead of native ruby - faster
         puts "#{test_name} log file lines: #{start_offset} - #{end_offset}"
-        %x{
-            "tail -n +#{total_lines} #{get_log_filename()} \
-                > #{test_report_dir}/#{$SQL_REPORT}"
-        }
+        log_split_cmd = 
+            "tail -n +#{start_offset} #{get_log_filename()} | " \
+            "head -n #{total_lines} > " \
+            "#{test_report_dir}/#{$SQL_REPORT}" 
+        %x{#{log_split_cmd}}
+       puts log_split_cmd 
 
     rescue Exception => e
         puts "ERRROR running test #{test_name} see report in #{$FAIL_DIR}"
