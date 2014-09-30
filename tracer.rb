@@ -73,7 +73,7 @@ def parse_test_file(filename)
             contents << line
         end
     end
-    contents
+    contents.chomp
 end
 
 def main(argv)
@@ -121,7 +121,7 @@ end
 def run_test(test_cmd, test_name, test_value)
     # 1:  establish test report directory and command
     test_report_dir = get_report_dir(test_name)
-    cmd = test_cmd + " " + test_value + " 2>&1"
+    cmd = test_cmd + " " + test_value
 
     # 2:  write script to re-run test
     File.write(test_report_dir + "/" + $RERUN_SCRIPT_NAME, $SHEBANG + cmd)
@@ -130,8 +130,8 @@ def run_test(test_cmd, test_name, test_value)
     start_offset = get_log_size()    
 
     # 4: run tests
-    begin
-        output = %x{#{cmd}}
+    begin 
+        output = %x{#{cmd} 2>&1}
         File.write(test_report_dir + "/" + $OUTPUT_REPORT, output)
 
         # 5: wait a X seconds for database to stabilise after tests
@@ -148,7 +148,7 @@ def run_test(test_cmd, test_name, test_value)
             "head -n #{total_lines} > " \
             "#{test_report_dir}/#{$SQL_REPORT}" 
         %x{#{log_split_cmd}}
-       puts log_split_cmd 
+       #puts log_split_cmd 
 
     rescue Exception => e
         puts "ERRROR running test #{test_name} see report in #{$FAIL_DIR}"
