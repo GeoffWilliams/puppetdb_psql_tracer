@@ -9,13 +9,14 @@ $TEST_EXT="txt"
 $TEST_FILE_GLOB="*.#{$TEST_EXT}"
 $PSQL_LOG_DIR="/var/log/pe-postgresql/pg_log"
 $DEFAULT_LOG_DELAY = 5
-$CMD_RAKE="/opt/puppet/bin/rake -f /opt/puppet/share/puppet-dashboard/Rakefile RAILS_ENV=production "
-$CMD_WS="curl "
+$CMD_RAKE="/opt/puppet/bin/rake -f /opt/puppet/share/puppet-dashboard/Rakefile RAILS_ENV=production"
+$CMD_WS="curl"
 $COMMENT="#"
 $RERUN_SCRIPT_NAME="run.sh"
 $SHEBANG="#!/opt/puppet/bin/ruby\n"
 $ERROR_REPORT="error.txt"
 $SQL_REPORT="sql.txt"
+$OUTPUT_REPORT="output.txt"
 
 def parse_command_line(args)
     status = true
@@ -120,7 +121,7 @@ end
 def run_test(test_cmd, test_name, test_value)
     # 1:  establish test report directory and command
     test_report_dir = get_report_dir(test_name)
-    cmd = test_cmd + " " + test_value
+    cmd = test_cmd + " " + test_value + " 2>&1"
 
     # 2:  write script to re-run test
     File.write(test_report_dir + "/" + $RERUN_SCRIPT_NAME, $SHEBANG + cmd)
@@ -130,7 +131,8 @@ def run_test(test_cmd, test_name, test_value)
 
     # 4: run tests
     begin
-        %x{#{cmd}}
+        output = %x{#{cmd}}
+        File.write(test_report_dir + "/" + $OUTPUT_REPORT, output)
 
         # 5: wait a X seconds for database to stabilise after tests
         sleep $options[:log_delay]
