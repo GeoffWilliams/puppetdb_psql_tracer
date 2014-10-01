@@ -1,0 +1,2 @@
+assets:clean
+assets:precompile

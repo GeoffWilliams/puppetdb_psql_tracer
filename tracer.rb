@@ -1,10 +1,11 @@
 #!/opt/puppet/bin/ruby
 require 'optparse'
 require 'fileutils'
+require 'pp'
 
 $REPORT_DIR="reports"
 $FAIL_DIR=$REPORT_DIR + "/fail"
-$TEST_DIR="tests"
+$DEFAULT_TEST_DIR="tests"
 $TEST_EXT="txt"
 $TEST_FILE_GLOB="*.#{$TEST_EXT}"
 $PSQL_LOG_DIR="/var/log/pe-postgresql/pg_log"
@@ -41,6 +42,11 @@ def parse_command_line(args)
             $options[:log_delay] = n
         end
 
+        $options[:test_dir] = $DEFAULT_TEST_DIR
+        opts.on("--test-dir t", String, "Directory containing test files (*.txt; default #{$DEFAULT_TEST_DIR}") do |t|
+            $options[:test_dir] = t
+        end
+
     end
     
     begin
@@ -65,15 +71,17 @@ def parse_command_line(args)
 end
 
 def parse_test_file(filename) 
-    contents = ""
+    contents = {}
     file = File.open(filename)
     file.each do |line|
         # ignore lines starting with comment character
         if ! line.start_with?($COMMENT)
-            contents << line
+            line = line.chomp
+            name = line.gsub(/[^\w\s]/,"_")
+            contents[name] = line
         end
     end
-    contents.chomp
+    pp contents
 end
 
 def main(argv)
@@ -108,19 +116,22 @@ def run_tests(tests)
         test_cmd = $CMD_WS
     end
 
-    tests.each do |test_name, test_value|
-        puts "running test: #{test_name}"
-        run_test(test_cmd, test_name, test_value)
+    tests.each do |group_test_name, group_test_value|
+        puts "\nrunning tests in: #{group_test_name}"
+        group_test_value.each do |test_name, test_value|
+            puts "running test: #{test_name}"
+            run_test(test_cmd, group_test_name, test_name, test_value)
+        end
     end
 end
 
-def get_report_dir(test_name)
-    $REPORT_DIR + "/" + test_name
+def get_report_dir(group_test_name, test_name)
+    $REPORT_DIR + "/" + group_test_name + "/" + test_name 
 end
 
-def run_test(test_cmd, test_name, test_value)
+def run_test(test_cmd, group_test_name, test_name, test_value)
     # 1:  establish test report directory and command
-    test_report_dir = get_report_dir(test_name)
+    test_report_dir = get_report_dir(group_test_name, test_name)
     cmd = test_cmd + " " + test_value
 
     # 2:  write script to re-run test
@@ -164,14 +175,14 @@ end
 
 def load_tests
     tests = {}
-    if File.directory?($TEST_DIR)
+    if File.directory?($options[:test_dir])
         # load each test - one file per test
-        Dir.glob($TEST_DIR + "/" + $TEST_FILE_GLOB) do |filename|
+        Dir.glob($options[:test_dir] + "/" + $TEST_FILE_GLOB) do |filename|
             testname = File.basename(filename).gsub(/\.#{$TEST_EXT}$/ , "")
             tests[testname] = parse_test_file(filename)
         end 
     else
-        puts "No test directory found at #{$TEST_DIR}"
+        puts "No test directory found at #{$options[:test_dir]}"
     end
     
     return tests
@@ -181,9 +192,13 @@ def create_report_dirs(tests)
     if File.directory?($REPORT_DIR)
         status = false
     else 
-        Dir.mkdir $REPORT_DIR
-        tests.each do |test_name,value|
-            Dir.mkdir get_report_dir(test_name)
+        # each test file...
+        tests.each do |group_test_name,group_tests|
+        
+            # lines in each test file...
+            group_tests.each do |test_name,test_data|
+                FileUtils.mkdir_p get_report_dir(group_test_name, test_name)
+            end
         end
         Dir.mkdir $FAIL_DIR
         status = true
