@@ -74,9 +74,9 @@ def parse_test_file(filename)
     contents = {}
     file = File.open(filename)
     file.each do |line|
-        # ignore lines starting with comment character
-        if ! line.start_with?($COMMENT)
-            line = line.chomp
+        # ignore lines starting with comment character or completely blank
+        line = line.chomp
+        if ! line.start_with?($COMMENT) && line != ""
             name = line.gsub(/[^\w\s]/,"_")
             contents[name] = line
         end

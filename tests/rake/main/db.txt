@@ -1,0 +1,17 @@
+#db:create 
+#db:drop 
+#db:drop_compliance_tables 
+#db:fixtures:load 
+#db:migrate 
+db:migrate:status 
+db:raw:dump 
+db:raw:optimize[mode] 
+#db:raw:restore 
+#db:rollback 
+db:schema:dump 
+#db:schema:load 
+#db:seed 
+#db:setup 
+db:structure:dump 
+db:version 
+

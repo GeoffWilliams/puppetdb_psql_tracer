@@ -1,0 +1,4 @@
+puppet:plugin:create_installed_semaphore 
+puppet:plugin:install 
+puppet:plugin:stage 
+puppet:plugin:uninstall 

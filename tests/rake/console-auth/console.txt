@@ -1,0 +1,2 @@
+console:auth:config:smtp[address,port,use_tls,username,password]
+console:auth:generate_secret

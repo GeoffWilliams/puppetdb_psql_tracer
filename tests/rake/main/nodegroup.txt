@@ -1,0 +1,17 @@
+nodegroup:add[name,classes,onexists] 
+nodegroup:add_all_nodes[name] 
+nodegroup:add_mcollective_nodes 
+nodegroup:addclass[name,class] 
+nodegroup:addclassparam[name,class,param,value] 
+nodegroup:addgroup[name,group] 
+nodegroup:del[name] 
+nodegroup:delclass[name,class] 
+nodegroup:delclassparam[name,class,param] 
+nodegroup:delgroup[name,group] 
+nodegroup:edit[name,classes] 
+nodegroup:list[match] 
+nodegroup:listclasses[name] 
+nodegroup:listclassparams[name,class] 
+nodegroup:listgroups[name] 
+nodegroup:variables[name,variables] 
+

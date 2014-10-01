@@ -1,0 +1,9 @@
+db:connect
+db:create_activations
+db:create_user
+db:migrate
+db:test
+db:test_users
+db:users:list
+db:users:remove[username]
+

@@ -1,0 +1,16 @@
+node:add[name,groups,classes,onexists] 
+node:addclass[name,class] 
+node:addclassparam[name,class,param,value] 
+node:addgroup[name,group] 
+node:classes[name,classes] 
+node:del[name] 
+node:delclassparam[name,class,param] 
+node:generate_unresponsive 
+node:groups[name,groups] 
+node:list[match] 
+node:listclasses[name] 
+node:listclassparams[name,class] 
+node:listgroups[name] 
+node:variables[name,variables] 
+nodeclass:add[name,onexists] 
+
