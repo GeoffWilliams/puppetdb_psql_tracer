@@ -6,10 +6,11 @@ require 'pp'
 $REPORT_DIR="reports"
 $FAIL_DIR=$REPORT_DIR + "/fail"
 $DEFAULT_TEST_DIR="tests"
+$DUMP_LOG_DIR="initial_dump"
 $TEST_EXT="txt"
 $TEST_FILE_GLOB="*.#{$TEST_EXT}"
 $PSQL_LOG_DIR="/var/log/pe-postgresql/pg_log"
-$DEFAULT_LOG_DELAY = 5
+$DEFAULT_LOG_DELAY = 1
 $CMD_RAKE="/opt/puppet/bin/rake -f /opt/puppet/share/puppet-dashboard/Rakefile RAILS_ENV=production"
 $CMD_WS="curl"
 $COMMENT="#"
@@ -18,6 +19,18 @@ $SHEBANG="#!/opt/puppet/bin/ruby\n"
 $ERROR_REPORT="error.txt"
 $SQL_REPORT="sql.txt"
 $OUTPUT_REPORT="output.txt"
+$RESTORE_REPORT="restore.txt"
+$DUMP_REPORT="dump.txt"
+$MARK="__MARK__"
+$CLEANUP="__CLEANUP__"
+$PG_BACKUP_FILE="/tmp/pe-puppetdb_initial_state.sql"
+$PSQL_CMD="/opt/puppet/bin/psql"
+$PG_DUMPALL_CMD="/opt/puppet/bin/pg_dumpall --clean"
+$DROPDB_CMD="/opt/puppet/bin/dropdb"
+$PUPPETDB_USER="pe-postgres"
+$PUPPETDB_INIT="/etc/init.d/pe-puppetdb"
+$PUPPET_INIT="/etc/init.d/pe-puppet"
+
 
 def parse_command_line(args)
     status = true
@@ -71,17 +84,19 @@ def parse_command_line(args)
 end
 
 def parse_test_file(filename) 
-    contents = {}
+    # contents must be an array to preserve ordering
+    contents = []
     file = File.open(filename)
     file.each do |line|
         # ignore lines starting with comment character or completely blank
         line = line.chomp
         if ! line.start_with?($COMMENT) && line != ""
-            name = line.gsub(/[^\w\s]/,"_")
-            contents[name] = line
+            name = line.chomp.gsub(/[^\w]/,"_")
+            test = { name => line }
+            contents.push(test)
         end
     end
-    pp contents
+    contents
 end
 
 def main(argv)
@@ -96,6 +111,9 @@ def main(argv)
                 puts "no tests found"
             else
                 if create_report_dirs(tests)
+                    puts "saving initial state..."
+                    initial_state()
+
                     puts "starting tests..."
                     run_tests(tests)
                 else
@@ -115,23 +133,27 @@ def run_tests(tests)
     else
         test_cmd = $CMD_WS
     end
-
-    tests.each do |group_test_name, group_test_value|
+    tests.each do |group_test_name, group_test_data |
         puts "\nrunning tests in: #{group_test_name}"
-        group_test_value.each do |test_name, test_value|
-            puts "running test: #{test_name}"
-            run_test(test_cmd, group_test_name, test_name, test_value)
+        group_test_data.each_with_index do |test_hash, test_no|
+            test_hash.each do |test_name, test_value|
+                mark(test_value)
+                cleanup(group_test_name, test_no, test_name, test_value)
+                puts "running test #{test_no}: #{test_name}"
+                run_test(test_no, test_cmd, group_test_name, test_name, test_value)
+            end
         end
     end
 end
 
-def get_report_dir(group_test_name, test_name)
-    $REPORT_DIR + "/" + group_test_name + "/" + test_name 
+def get_report_dir(test_no, group_test_name, test_name)
+    test_no_formatted = test_no.to_s.rjust(2, "0")
+    $REPORT_DIR + "/" + group_test_name + "/" + test_no_formatted + "_" + test_name 
 end
 
-def run_test(test_cmd, group_test_name, test_name, test_value)
+def run_test(test_no, test_cmd, group_test_name, test_name, test_value)
     # 1:  establish test report directory and command
-    test_report_dir = get_report_dir(group_test_name, test_name)
+    test_report_dir = get_report_dir(test_no, group_test_name, test_name)
     cmd = test_cmd + " " + test_value
 
     # 2:  write script to re-run test
@@ -184,8 +206,7 @@ def load_tests
     else
         puts "No test directory found at #{$options[:test_dir]}"
     end
-    
-    return tests
+    tests
 end
 
 def create_report_dirs(tests)
@@ -193,17 +214,43 @@ def create_report_dirs(tests)
         status = false
     else 
         # each test file...
-        tests.each do |group_test_name,group_tests|
-        
-            # lines in each test file...
-            group_tests.each do |test_name,test_data|
-                FileUtils.mkdir_p get_report_dir(group_test_name, test_name)
+        tests.each do |group_test_name, group_tests|
+            group_tests.each_with_index do |test_data_hash, test_no|
+                # lines in each test file...
+                test_data_hash.each do |test_name,test_data|
+                    FileUtils.mkdir_p get_report_dir(test_no, group_test_name, test_name)
+                end
             end
         end
-        Dir.mkdir $FAIL_DIR
+
+        # directory for failed tests
+        FileUtils.mkdir_p $FAIL_DIR
+
+        # directory for initial dump log
+        FileUtils.mkdir_p $DUMP_LOG_DIR
         status = true
     end
     return status
+end
+
+def mark(test_value)
+    if test_value.start_with?($MARK)
+        message = test_value.gsub(/#{$MARK}\s+/,"")
+        # sleep until log activity dies down then
+        # mark the log file with a debug message
+        # NOTE - writes this to the main log file!
+        sleep $options[:log_delay]
+        message_line = "=====[#{message}]====================\n"
+        %x{cat message_line >> get_log_filename()}
+    end
+end
+
+
+def cleanup(group_test_name, test_no, test_name, test_value)
+    # cleanup the system state to reflect undo effect of tests
+    if test_value.start_with?($CLEANUP)
+       restore_initial_state(group_test_name, test_no, test_name)
+    end
 end
 
 def get_log_filename
@@ -217,4 +264,49 @@ def get_log_size
     return %x{wc -l #{get_log_filename()}}.split.first.to_i
 end
 
+def initial_state
+    # take dump of postgres initial state for puppet db
+    service("stop")
+    sleep $options[:log_delay]
+
+    puts "dumping initial state to #{$PG_BACKUP_FILE}"
+    initial_log = %x{sudo -Hu #{$PUPPETDB_USER} bash -c "#{$PG_DUMPALL_CMD} > #{$PG_BACKUP_FILE} 2>&1"}
+    
+    File.write($DUMP_LOG_DIR + "/" + $DUMP_REPORT, $initial_log)
+    
+    service("start")
+end
+
+def service(state)
+    %x{#{$PUPPETDB_INIT} #{state}}
+    %x{#{$PUPPET_INIT} #{state}}
+end
+
+def get_restore_log(test_no, group_test_name, test_name)
+    get_report_dir(test_no, group_test_name, test_name) + "/" + $RESTORE_REPORT
+end
+
+def restore_initial_state(group_test_name, test_no, test_name)
+    # restore database dump and restart pe-puppetdb
+    
+    # stop puppetdb
+    service("stop")
+
+    # drop all databases
+    
+    # restore database
+    restore_log = %x{sudo -Hu #{$PUPPETDB_USER} bash -c "#{$PSQL_CMD} < #{$PG_BACKUP_FILE} 2>&1"}
+
+    # log the restore output for troubleshooting
+    File.write(
+        get_restore_log(test_no, group_test_name, test_name),
+        restore_log)
+
+    # start database
+    service("start")
+    sleep $options[:log_delay]
+    # done
+end
+
+# entry into main program
 main(ARGV)
