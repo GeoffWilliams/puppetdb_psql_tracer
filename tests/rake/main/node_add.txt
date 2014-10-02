@@ -1,0 +1,14 @@
+nodegroup:add[mygroup]
+__MARK__ added mygroup group
+node:add[agent-0]
+node:add[agent-1, mygroup]
+node:add[agent-2, mygroup, apache]
+node:add[agent-3, mygroup, apache, onexists]
+__CLEANUP__
+node:addclass[agent-0,apache]
+node:addclassparam[agent-0,apache,docroot,/var/apache/www]
+node:delclassparam[name,class,param] 
+nodegroup:add[mygroup]
+__MARK__ added mygroup group
+node:addgroup[agent-0,mygroup] 
+__CLEANUP__

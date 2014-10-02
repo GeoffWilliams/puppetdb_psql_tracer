@@ -1,20 +1,19 @@
 node:add[agent-0]
-node:add[agent-0, mygroup]
-node:add[agent-0, mygroup, apache]
-node:add[agent-0, mygroup, apache, onexists]
-node:add[agent-0, mygroup, apache, onexists]
-node:addclass[agent-0,apache]
-node:addclassparam[agent-0,apache,docroot,/var/apache/www] 
-node:addgroup[agent-0,mygroup] 
-node:classes[agent-1,apache] 
-node:del[agent-1] 
-node:delclassparam[name,class,param] 
+__MARK__ added agent-0
+node:classes[agent-0,apache] 
+__CLEANUP__
+node:add[agent-0]
+__MARK__ added agent-0
+node:del[agent-0] 
+__CLEANUP__
 node:generate_unresponsive 
-node:groups[name,groups] 
-node:list[match] 
-node:listclasses[name] 
-node:listclassparams[name,class] 
-node:listgroups[name] 
-node:variables[name,variables] 
-nodeclass:add[name,onexists] 
+
+node:add[agent-0]
+__MARK__ added agent-0
+node:add[agent-0]
+nodegroup:add[mygroup]
+__MARK__ added node agent-0 and mygroup group
+node:groups[agent-0,mygroup] 
+node:variables[agent0,foo=bar] 
+nodeclass:add[apache,onexists] 
 

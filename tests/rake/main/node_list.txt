@@ -1,0 +1,7 @@
+node:add[agent-0,default,apache]
+__MARK__ added agent-0 to default group and apache class
+node:list[/.\*/] 
+node:listclasses[apache] 
+node:listclassparams[default,apache] 
+node:listgroups[default] 
+__CLEANUP__
